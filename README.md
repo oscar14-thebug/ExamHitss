@@ -5,6 +5,11 @@ E2E de Playwright + TypeScript para el flujo de liverpool.com.mx: buscar →
 filtrar por color → ordenar por precio, validando la UI contra la respuesta
 real de `/api/plp/search`.
 
+Bonus de pruebas basadas en datos implementado: el mismo flujo corre
+parametrizado para 3 términos (`"playstation 5"`, `"xbox series x"`,
+`"nintendo switch"`) — ver `testData.searchTerms` en
+[`src/utils/test-data.ts`](./src/utils/test-data.ts).
+
 ## Instalación
 
 ```
