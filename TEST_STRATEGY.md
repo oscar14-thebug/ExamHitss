@@ -22,6 +22,11 @@ real de `/api/plp/search`, en vez de confiar solo en el DOM.
 - `src/types/api.types.ts` — tipado de la respuesta de `/api/plp/search`.
 - `src/utils/test-data.ts` — datos de prueba (término de búsqueda, color,
   opciones de orden).
+- `src/config/test-mode.ts` — `getTestMode()`, lee `TEST_MODE` (`mock` por
+  defecto, `live` opcional). Ver "Modos de ejecución" más abajo.
+- `tests/fixtures/` — fixture del modo mockeado: `products.fixture.ts`
+  (catálogo), `search-results-page.fixture.html` (página autocontenida) y
+  `mock-liverpool-site.ts` (instalador de `page.route`).
 
 ## Estrategia de espera de red (wait encadenado)
 
@@ -83,3 +88,88 @@ conectado, y quitar los comentarios `TODO` una vez verificados.
 - `forbidOnly` en CI evita que un `.only` quede mergeado por accidente.
 - Trace/video/screenshot solo en fallo o primer reintento, para no inflar los
   artefactos de builds verdes.
+
+## BLOQUEADOR: WAF de Akamai rechaza el navegador de Playwright en prod
+
+**El WAF de Akamai bloquea de forma consistente el acceso automatizado a
+`https://www.liverpool.com.mx` en producción real:**
+
+- `page.goto('https://www.liverpool.com.mx/')` devuelve `403 Access Denied`
+  (página de error de Akamai, referencia tipo
+  `errors.edgesuite.net/18.xxxxxxxx.<timestamp>.xxxxxxxx`) en el 100% de los
+  intentos verificados (3/3, con pausas de 4s entre cada uno) — no es
+  rate-limit ni intermitencia.
+- Reproduce igual en headless y en headed (`HEADED=1`), así que no es
+  detección de "headless" simple; es fingerprinting del Bot Manager de
+  Akamai contra la automatización vía CDP (Chromium de Playwright / señales
+  como `navigator.webdriver`).
+- `curl` con el mismo User-Agent de navegador **sí** obtiene `200` (tras un
+  `301` a `/tienda/home`), lo que descarta bloqueo por IP o por User-Agent
+  puro — el bloqueo es específico del navegador automatizado.
+- Esto ocurre en el primer `goto()`, antes de tocar ningún selector. Ningún
+  selector después del primero (grupo de color, combo de orden, tarjetas de
+  precio) puede verificarse contra el DOM real mientras esto no se resuelva.
+
+### Por qué no se intentó evadir la detección
+
+No se probó Chrome real vía `channel: 'chrome'`, flags anti-automatización,
+ni ninguna técnica de "stealth" para bajar la señal de automatización.
+Mismo criterio que aplica a CAPTCHAs y otros mecanismos de bot-detection:
+evadir la protección de un sitio en vivo no es parte de escribir o afinar
+selectores de prueba, es sortear un control de seguridad gestionado por el
+propio sitio — algo que requiere autorización explícita del equipo dueño de
+liverpool.com.mx (whitelist, ambiente de staging, credenciales de QA), no
+una decisión unilateral de la suite de automatización. Por eso el camino
+elegido es el modo mockeado descrito abajo: permite terminar y verificar
+toda la lógica del framework sin necesitar sortear nada.
+
+**Siguiente paso, a decidir por el equipo:** confirmar si existe un ambiente
+de pruebas sin este WAF, o una forma autorizada de exceptuarlo para
+ejecución de QA automatizado (whitelist de IP de CI, ambiente de staging,
+token de bypass). Hasta entonces, la forma real del payload de
+`/api/plp/search` y los selectores de `SearchResultsPage` siguen sin
+verificar contra el sitio real — sí quedan verificados contra el contrato
+que la propia suite define en su fixture (ver siguiente sección).
+
+## Modos de ejecución: mockeado (`mock`, por defecto) vs. real (`live`)
+
+Como consecuencia directa del bloqueo anterior, la suite corre en dos modos,
+elegidos por la variable de entorno `TEST_MODE` (`src/config/test-mode.ts`):
+
+### `TEST_MODE=mock` (default — también el default en CI)
+
+`tests/fixtures/mock-liverpool-site.ts` intercepta con `page.route()` **todo**
+el origen `https://www.liverpool.com.mx/**`, antes de que cualquier request
+salga a la red real:
+
+- La navegación al documento (`resourceType() === 'document'`) se responde
+  con `tests/fixtures/search-results-page.fixture.html` — una página estática
+  autocontenida (CSS/JS inline, sin requests a assets externos) que expone el
+  mismo contrato de selectores que asumen los POM: dos `searchbox` (desktop
+  y " - movil", para regresionar el fix de strict-mode), un grupo de color,
+  un combo de orden con las opciones `sortPrice|0` / `sortPrice|1`, y
+  tarjetas de producto con precio.
+- Cualquier llamada a `/api/plp/search` (disparada por el propio JS de la
+  fixture al buscar/filtrar/ordenar) se responde con JSON generado a partir
+  de `tests/fixtures/products.fixture.ts` (7 productos, precios variados, 4
+  con "Blanco" entre sus colores), filtrado/ordenado según los query params
+  `color` y `sort` que la fixture construye.
+- Cualquier otra request al origen (no debería haber ninguna, al ser la
+  fixture autocontenida) se aborta explícitamente en vez de dejarla pasar.
+
+**Qué valida este modo:** toda la lógica propia del framework de forma
+determinista y sin red externa — el wait encadenado de
+`triggerAndWaitForSearchResponse`, la extracción/parseo de precios, la
+derivación de dirección de orden desde la etiqueta visible, y el cruce
+UI-vs-API. **Qué NO valida:** que los selectores y la forma del payload
+coincidan con el sitio real — eso sigue pendiente del punto anterior, porque
+la fixture encarna nuestras propias suposiciones, no el DOM/API reales.
+
+### `TEST_MODE=live`
+
+Corre contra `https://www.liverpool.com.mx` sin ningún mock (solo con
+`blockTrackingRequests` activo). Hoy falla por el WAF descrito arriba; solo
+sería viable desde un entorno con whitelist/staging del lado de Liverpool —
+por eso **no** es el modo por defecto en CI (los runners de GitHub Actions
+tampoco estarían whitelisteados y fallarían igual). Ver `README.md` para
+cómo invocarlo.

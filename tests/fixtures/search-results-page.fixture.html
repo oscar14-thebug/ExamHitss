@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8" />
+<title>Fixture PLP mockeado</title>
+<style>
+  body { font-family: sans-serif; margin: 1rem; }
+  [hidden] { display: none !important; }
+  .product-card { border: 1px solid #ccc; padding: 0.5rem; margin: 0.25rem 0; }
+</style>
+</head>
+<body>
+  <header>
+    <!--
+      Reproduce a propósito el bug real: dos searchbox coexisten en el DOM
+      con el mismo texto visible/placeholder, distinguibles solo por
+      aria-label exacto (desktop vs. " - movil"). Sirve para regresionar el
+      fix de HomePage.searchInput (getByRole con name exact:true).
+    -->
+    <input type="search" aria-label="Buscar por producto, categoría y más..." id="search-desktop" />
+  </header>
+  <nav class="mobile-nav">
+    <input type="search" aria-label="Buscar por producto, categoría y más... - movil" id="search-mobile" />
+  </nav>
+
+  <main id="results" hidden>
+    <section role="group" aria-label="Color">
+      <label><input type="checkbox" name="color" value="Blanco" /> Blanco</label>
+      <label><input type="checkbox" name="color" value="Negro" /> Negro</label>
+      <label><input type="checkbox" name="color" value="Azul" /> Azul</label>
+    </section>
+
+    <select aria-label="Ordenar por" id="sort-select">
+      <option value="">Relevancia</option>
+      <option value="sortPrice|0">Precio: menor a mayor</option>
+      <option value="sortPrice|1">Precio: mayor a menor</option>
+    </select>
+
+    <div id="product-list"></div>
+  </main>
+
+<script>
+  var state = { q: '', color: '', sort: '' };
+
+  function render(json) {
+    var list = document.getElementById('product-list');
+    list.innerHTML = '';
+    json.products.forEach(function (p) {
+      var card = document.createElement('div');
+      card.className = 'product-card';
+      card.setAttribute('data-testid', 'product-card');
+      var name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = p.name;
+      var price = document.createElement('div');
+      price.className = 'price';
+      price.setAttribute('data-testid', 'product-price');
+      price.textContent = '$' + p.price.price.toFixed(2);
+      card.appendChild(name);
+      card.appendChild(price);
+      list.appendChild(card);
+    });
+  }
+
+  function fetchResults() {
+    var params = new URLSearchParams();
+    if (state.q) params.set('q', state.q);
+    if (state.color) params.set('color', state.color);
+    if (state.sort) params.set('sort', state.sort);
+    return fetch('/api/plp/search?' + params.toString())
+      .then(function (res) { return res.json(); })
+      .then(function (json) {
+        document.getElementById('results').hidden = false;
+        render(json);
+      });
+  }
+
+  document.getElementById('search-desktop').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      state.q = e.target.value;
+      fetchResults();
+    }
+  });
+
+  document.querySelectorAll('input[name="color"]').forEach(function (el) {
+    el.addEventListener('change', function (e) {
+      state.color = e.target.checked ? e.target.value : '';
+      fetchResults();
+    });
+  });
+
+  document.getElementById('sort-select').addEventListener('change', function (e) {
+    state.sort = e.target.value;
+    fetchResults();
+  });
+</script>
+</body>
+</html>

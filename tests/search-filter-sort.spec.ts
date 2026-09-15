@@ -3,10 +3,21 @@ import { HomePage } from '../src/pages/HomePage';
 import { SearchResultsPage } from '../src/pages/SearchResultsPage';
 import { blockTrackingRequests } from '../src/utils/network';
 import { testData } from '../src/utils/test-data';
+import { getTestMode } from '../src/config/test-mode';
+import { installMockedLiverpoolSite } from './fixtures/mock-liverpool-site';
 
 test.describe('PLP: búsqueda → filtro por color → orden por precio', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    const mode = getTestMode();
+    testInfo.annotations.push({ type: 'test-mode', description: mode });
+
     await blockTrackingRequests(page);
+    if (mode === 'mock') {
+      // TEST_MODE=mock (default): never touches the real site — see
+      // TEST_STRATEGY.md -> "Modo mockeado". Set TEST_MODE=live to run
+      // against the real origin instead (requires WAF whitelist).
+      await installMockedLiverpoolSite(page);
+    }
   });
 
   test('filtra por color y ordena por precio, validado contra /api/plp/search', async ({
@@ -25,7 +36,11 @@ test.describe('PLP: búsqueda → filtro por color → orden por precio', () => 
     await test.step(`Filtrar por color "${testData.colorFilter.label}"`, async () => {
       const filterResponse = await results.filterByColor(testData.colorFilter.label);
 
-      expect(filterResponse.products.length).toBeGreaterThan(0);
+      // El reto pide al menos 5 resultados tras búsqueda + filtro de color.
+      expect(
+        filterResponse.products.length,
+        `Se esperaban >= 5 resultados para "${testData.baseSearchTerm}" + color "${testData.colorFilter.label}", hubo ${filterResponse.products.length}`
+      ).toBeGreaterThanOrEqual(5);
       for (const product of filterResponse.products) {
         if (product.colors && product.colors.length > 0) {
           const colorsText = product.colors.join(',').toLowerCase();

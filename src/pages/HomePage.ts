@@ -8,11 +8,16 @@ export class HomePage {
 
   constructor(page: Page) {
     this.page = page;
-    // TODO: selector unverified against live DOM (browser access was
-    // unavailable while authoring this suite) — confirm on first real run.
-    this.searchInput = page
-      .getByRole('searchbox')
-      .or(page.getByPlaceholder(/buscar/i));
+    // Desktop and mobile search inputs are both present in the DOM
+    // simultaneously and share the same placeholder — a bare role/placeholder
+    // locator matches both and trips Playwright's strict-mode check. They're
+    // distinguished by aria-label: desktop has the exact label below, mobile
+    // has the same label with a " - movil" suffix. `exact: true` pins this to
+    // the desktop input only.
+    this.searchInput = page.getByRole('searchbox', {
+      name: 'Buscar por producto, categoría y más...',
+      exact: true,
+    });
   }
 
   async goto(): Promise<void> {

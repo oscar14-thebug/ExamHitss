@@ -8,10 +8,10 @@
 // correctness of the assertion.
 
 export const testData = {
-  baseSearchTerm: 'playera',
+  baseSearchTerm: 'playstation 5',
 
   colorFilter: {
-    label: 'Negro',
+    label: 'Blanco',
   },
 
   sortOptions: {
