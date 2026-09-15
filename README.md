@@ -1,4 +1,5 @@
 # liverpool-search-automation
+![Tests](https://github.com/oscar14-thebug/ExamHitss/actions/workflows/playwright.yml/badge.svg)
 
 E2E de Playwright + TypeScript para el flujo de liverpool.com.mx: buscar →
 filtrar por color → ordenar por precio, validando la UI contra la respuesta
