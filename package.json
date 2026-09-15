@@ -1,0 +1,20 @@
+{
+  "name": "liverpool-search-automation",
+  "version": "1.0.0",
+  "description": "E2E automation for liverpool.com.mx search/filter/sort flow with network cross-validation, built with Playwright + TypeScript.",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install --with-deps",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.0"
+  }
+}
