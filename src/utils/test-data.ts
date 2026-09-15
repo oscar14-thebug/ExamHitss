@@ -8,7 +8,10 @@
 // correctness of the assertion.
 
 export const testData = {
-  baseSearchTerm: 'playstation 5',
+  // El mismo flujo (buscar → filtrar por color → ordenar → cruzar UI/API)
+  // corre una vez por cada término, parametrizado en el spec vía un for
+  // sobre este array (ver tests/search-filter-sort.spec.ts).
+  searchTerms: ['playstation 5', 'xbox series x', 'nintendo switch'] as const,
 
   colorFilter: {
     label: 'Blanco',

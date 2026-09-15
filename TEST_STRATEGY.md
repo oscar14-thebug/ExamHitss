@@ -12,6 +12,16 @@ Un único spec (`tests/search-filter-sort.spec.ts`), estructurado en
 Cada paso se valida cruzando lo que muestra la UI contra la respuesta JSON
 real de `/api/plp/search`, en vez de confiar solo en el DOM.
 
+Prueba basada en datos: el mismo flujo corre una vez por cada término de
+`testData.searchTerms` (`"playstation 5"`, `"xbox series x"`,
+`"nintendo switch"`) — un `test()` por término generado con un `for` dentro
+de `tests/search-filter-sort.spec.ts`, sin duplicar la lógica de los pasos.
+Playwright no tiene `describe.each()` (es API de Jest/Vitest); el patrón
+idiomático aquí es ese `for` generando un `test()` por caso. Cada iteración
+exige: >= 5 resultados tras búsqueda + filtro de color, orden de precio real
+(ascendente, verificado contra la respuesta de la API, no asumido), y que al
+menos 3 de los primeros 5 precios coincidan entre UI y API.
+
 ## Arquitectura
 
 - `src/pages/HomePage.ts` y `src/pages/SearchResultsPage.ts` — Page Object
@@ -151,9 +161,13 @@ salga a la red real:
   tarjetas de producto con precio.
 - Cualquier llamada a `/api/plp/search` (disparada por el propio JS de la
   fixture al buscar/filtrar/ordenar) se responde con JSON generado a partir
-  de `tests/fixtures/products.fixture.ts` (7 productos, precios variados, 4
-  con "Blanco" entre sus colores), filtrado/ordenado según los query params
-  `color` y `sort` que la fixture construye.
+  de `tests/fixtures/products.fixture.ts` (24 productos: 3 franquicias ×
+  8 productos — PlayStation 5, Xbox Series X, Nintendo Switch —, precios
+  variados, 7 de cada 8 con "Blanco" entre sus colores), filtrado/ordenado
+  según los query params `q`, `color` y `sort` que la fixture construye. El
+  filtro por `q` exige que cada palabra del término de búsqueda aparezca en
+  el nombre del producto — deliberadamente estricto, para que un término
+  equivocado devuelva menos resultados en vez de pasar en silencio.
 - Cualquier otra request al origen (no debería haber ninguna, al ser la
   fixture autocontenida) se aborta explícitamente en vez de dejarla pasar.
 
